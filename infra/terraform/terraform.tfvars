@@ -1,0 +1,6 @@
+aws_region = "eu-north-1"
+key_name   = "yasenapp"
+repo_url   = "https://github.com/yasen400/liftbrain"
+allowed_ssh_cidr = "88.203.211.224/32"
+letsencrypt_email = "yasenbg4@gmail.com"
+app_domain = "gym-fit-ai.com"
