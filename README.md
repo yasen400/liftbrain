@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## LiftBrain
 
-## Getting Started
+LiftBrain is a small-footprint strength training OS for solo lifters or tiny squads (≈4 users). It keeps everything on a single EC2 instance: Next.js UI + API routes, SQLite via Prisma, OpenAI-powered coaching, reverse proxy, and cron-based backups. Infrastructure is reproducible with Terraform and docker-compose.
 
-First, run the development server:
+### Architecture Highlights
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **App**: Next.js 14 (App Router, TypeScript, Tailwind). API routes handle auth, workout logs, analytics, and AI prompts.
+- **Metrics**: Server-rendered dashboards pull live stats through `getDashboardData` (weekly sets, muscle volume, and estimated 1RM trends).
+- **Data**: Prisma + SQLite stored on a Docker volume. For such a tiny user base SQLite removes the need for a managed database while still providing ACID semantics.
+- **AI Integration**: Server-side OpenAI client (`OPENAI_API_KEY`) with strict JSON schemas for plan generation/adjustments.
+- **Hosting**: One Ubuntu t3.micro EC2 instance in the default VPC. Docker Compose orchestrates the app, Caddy (TLS + reverse proxy), and a lightweight backup cron container.
+- **IaC**: Terraform provisions the EC2 instance, security group, and cloud-init bootstrap script that installs Docker, clones this repo, and runs `docker compose up -d`.
+
+### Monorepo Layout
+
+```
+├── docker-compose.yml          # app + caddy + backup
+├── Dockerfile                  # multi-stage Next.js build
+├── prisma/                     # SQLite schema + migrations later
+├── src/                        # Next.js app (dashboard, API routes, AI helpers)
+├── infra/
+│   ├── caddy/Caddyfile         # HTTPS termination & reverse proxy
+│   ├── backup/cron/root        # nightly SQLite tarball
+│   └── terraform/              # providers.tf, main.tf, variables.tf, outputs.tf, cloud-init.tpl
+└── README.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Install dependencies: `npm install`
+2. Copy `.env.example` → `.env` and set secrets (especially `OPENAI_API_KEY` if you want to hit the AI endpoint).
+3. Generate the Prisma client and create the dev database:
+	```bash
+	npx prisma generate
+	npx prisma migrate dev --name init # optional once migrations exist
+	```
+4. Seed the exercise library + demo user (password `demo1234`): `npm run prisma:seed`
+5. Start the dev server: `npm run dev`
+6. Visit [http://localhost:3000](http://localhost:3000)
+7. Hit `/register` to create your own account, then `/login` to sign in (NextAuth credentials provider + bcrypt hashes).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Useful Scripts
 
-## Learn More
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Next.js dev server |
+| `npm run build` | Production build |
+| `npm run start` | Run compiled app |
+| `npm run lint` | ESLint |
+| `npm run prisma:generate` | (Add to package.json) Generate Prisma client |
 
-To learn more about Next.js, take a look at the following resources:
+## Docker Workflow
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+docker compose build
+docker compose up -d
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `app` exposes port 3000 internally; Caddy terminates TLS on 80/443 and routes to `app:3000`.
+- `.env` feeds the container secrets (Session/JWT secrets, OpenAI key, etc.).
+- The `app_data` volume keeps `prisma/dev.db` so state survives deployments.
+- Nightly cron compresses the SQLite file into `/data/liftbrain-YYYYMMDD.tar.gz` inside the volume (copy it off-box or sync to S3 manually).
 
-## Deploy on Vercel
+## Terraform Deployment (Single Command Flow)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+> Need a detailed walkthrough? See `docs/deployment-guide.md` for prerequisites, SSH/secrets upload, DNS, and lifecycle tips.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Prereqs: Terraform ≥ 1.6, AWS CLI configured (`aws configure`), existing EC2 key pair for SSH, Route53 (optional) pointing your domain to the instance.
+
+1. `cd infra/terraform`
+2. Copy `terraform.tfvars.example` → `terraform.tfvars` and fill values:
+	```hcl
+	aws_region       = "us-east-1"
+	key_name         = "my-keypair"
+	repo_url         = "https://github.com/you/liftbrain.git"
+	allowed_ssh_cidr = "203.0.113.10/32"
+	letsencrypt_email = "you@example.com"
+	app_domain       = "liftbrain.example.com"
+	```
+3. `terraform init`
+4. `terraform apply`
+5. Outputs show public IP + DNS. Once `cloud-init` finishes the site is reachable via the public DNS or your domain.
+6. (Optional) SSH in for troubleshooting: `ssh -i key.pem ubuntu@<public_dns>`
+
+Destroying everything: `terraform destroy`
+
+### Cloud-Init Recap
+
+The bootstrap script on the EC2 host:
+1. Installs Docker + compose plugin
+2. Clones this repo into `/opt/liftbrain`
+3. Copies `.env.example` if `.env` is missing (you can later edit with real secrets)
+4. Runs `docker compose pull && docker compose up -d`
+
+## Next Steps
+
+- Persist AI plans into `WorkoutTemplate` records and expose approval flows
+- Flesh out analytics queries (Prisma aggregations → Recharts)
+- Harden the backup workflow (sync tarballs to S3 or automate downloads)
+- Add progressive overload insights (e.g., rolling tonnage trends, 1RM estimates)
+- Backfill integration tests for workout logging + history endpoints
+
+## Troubleshooting
+
+- **OpenAI errors**: ensure `OPENAI_API_KEY` is set in `.env` or injected into the EC2 environment before `docker compose up`.
+- **Docker compose fails on EC2**: confirm the repo URL in Terraform is reachable (public HTTPS) and that the key pair allows SSH if you need to log in.
+- **Port 80/443 already in use**: stop `apache2` or other daemons on the host before re-running compose.

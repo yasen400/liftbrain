@@ -1,0 +1,19 @@
+{$APP_DOMAIN:localhost}
+encode gzip zstd
+log {
+  output stdout
+  format console
+}
+
+@http_to_https {
+  protocol http
+  header_regexp Host ^.+$
+}
+
+handle @http_to_https {
+  redir https://{host}{uri}
+}
+
+handle {
+  reverse_proxy app:3000
+}

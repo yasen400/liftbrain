@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String
+  role             String    @default("athlete")
+  age              Int?
+  sex              String?
+  bodyweightKg     Float?
+  experienceLevel  String    @default("BEGINNER")
+  equipmentProfile String    @default("FULL_GYM")
+  goalFocus        String?   @default("HYPERTROPHY")
+  scheduleWorkoutsPerWeek Int? 
+  scheduleMinutesPerSession Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  goals            Goal[]
+  workoutTemplates WorkoutTemplate[]
+  workouts         WorkoutSession[]
+  preferences      UserExercisePreference[]
+  aiRecommendations AiRecommendation[]
+}
+
+model Goal {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  type         String
+  targetMetric String
+  targetValue  Float?
+  targetDate   DateTime?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Exercise {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  primaryMuscle      String
+  secondaryMuscles   String   @default("[]")
+  movementPattern    String
+  equipment          String
+  difficulty         String
+  defaultReps        String?
+  defaultSets        Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  templateExercises  TemplateDayExercise[]
+  setEntries         SetEntry[]
+  userPreferences    UserExercisePreference[]
+}
+
+model UserExercisePreference {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  exerciseId String
+  favorite   Boolean  @default(false)
+  notes      String?
+  createdAt  DateTime @default(now())
+}
+
+model WorkoutTemplate {
+  id          String      @id @default(cuid())
+  user        User        @relation(fields: [userId], references: [id])
+  userId      String
+  name        String
+  description String?
+  weeklyDays  Int
+  aiVersion   Int        @default(1)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  days        TemplateDay[]
+}
+
+model TemplateDay {
+  id               String      @id @default(cuid())
+  workoutTemplate  WorkoutTemplate @relation(fields: [workoutTemplateId], references: [id])
+  workoutTemplateId String
+  dayIndex         Int
+  dayName          String
+  focusArea        String?
+  exercises        TemplateDayExercise[]
+  sessions         WorkoutSession[]
+}
+
+model TemplateDayExercise {
+  id            String    @id @default(cuid())
+  templateDay   TemplateDay @relation(fields: [templateDayId], references: [id])
+  templateDayId String
+  exercise      Exercise  @relation(fields: [exerciseId], references: [id])
+  exerciseId    String
+  prescribedSets Int
+  prescribedReps String
+  targetRpe     Float?
+  initialWeightKg Float?
+  instructions  String?
+}
+
+model WorkoutSession {
+  id                String     @id @default(cuid())
+  user              User       @relation(fields: [userId], references: [id])
+  userId            String
+  templateDay       TemplateDay? @relation(fields: [templateDayId], references: [id])
+  templateDayId     String?
+  sessionDate       DateTime
+  perceivedDifficulty Int?
+  durationMinutes   Int?
+  notes             String?
+  createdAt         DateTime   @default(now())
+  setEntries        SetEntry[]
+}
+
+model SetEntry {
+  id              String    @id @default(cuid())
+  workoutSession  WorkoutSession @relation(fields: [workoutSessionId], references: [id])
+  workoutSessionId String
+  exercise        Exercise  @relation(fields: [exerciseId], references: [id])
+  exerciseId      String
+  setNumber       Int
+  reps            Int
+  weightKg        Float?
+  rpe             Float?
+  isPr            Boolean  @default(false)
+  notes           String?
+}
+
+model AiRecommendation {
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id])
+  userId         String
+  type           String
+  promptSnapshot String
+  responsePayload String
+  applied        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
