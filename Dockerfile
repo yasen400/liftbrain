@@ -28,11 +28,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN groupadd -r nextjs && useradd -r -g nextjs nextjs
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
-RUN npm ci --omit=dev
-RUN npm run prisma:generate
+COPY --from=builder /app/prisma ./prisma
+RUN npm ci --omit=dev && npm run prisma:generate
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/prisma ./prisma
 RUN chown -R nextjs:nextjs /app
 USER nextjs
 EXPOSE 3000
