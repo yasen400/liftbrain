@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
+import { GOAL_FOCUS_OPTIONS } from '@/lib/constants/goalFocus';
 
 export function RegisterForm() {
   const [loading, setLoading] = useState(false);
@@ -76,10 +77,11 @@ export function RegisterForm() {
       <div>
         <label className="text-sm font-medium text-slate-700">Primary goal</label>
         <select name="goalFocus" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
-          <option value="HYPERTROPHY">Build muscle</option>
-          <option value="STRENGTH">Strength / PRs</option>
-          <option value="FAT_LOSS">Cut / fat loss</option>
-          <option value="POWERBUILDING">Powerbuilding</option>
+          {GOAL_FOCUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
       <button

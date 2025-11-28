@@ -39,6 +39,39 @@ LiftBrain is a small-footprint strength training OS for solo lifters or tiny squ
 6. Visit [http://localhost:3000](http://localhost:3000)
 7. Hit `/register` to create your own account, then `/login` to sign in (NextAuth credentials provider + bcrypt hashes).
 
+### Progress photo uploads (Phase 2)
+
+The new progress photo workflow signs uploads directly against S3 (or any S3-compatible bucket). Set the following environment variables in `.env` (or your deployment secrets) before using `/api/uploads/progress-photo`:
+
+| Variable | Purpose |
+| --- | --- |
+| `PROGRESS_PHOTO_BUCKET` | Target bucket for storing images |
+| `PROGRESS_PHOTO_REGION` | AWS region for that bucket |
+| `PROGRESS_PHOTO_PUBLIC_URL` | Optional CDN/base URL (defaults to the S3 HTTPS URL) |
+| `PROGRESS_PHOTO_ACCESS_KEY_ID` / `PROGRESS_PHOTO_SECRET_ACCESS_KEY` | Credentials with `s3:PutObject` permissions (falls back to `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` if omitted) |
+
+Client uploads are limited to 10 MB JPEG/PNG/WebP/HEIC images. Missing env vars will cause the API route to return a 500 until configured.
+
+### AI analysis pipelines (Phase 3)
+
+Phase 3 adds three server-side analysis steps that can be triggered on-demand (or from a cron runner):
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/ai/compliance` | Summarizes the last seven logged sessions (set completion, RPE deltas, lagging movements) and stores an `AiRecommendation` row. |
+| `POST /api/ai/body-comp` | Reviews the latest weight/check-in data plus progress-photo URLs to recommend macro adjustments. |
+| `POST /api/ai/weekly-plan` | Runs both analyzers, combines the results, and creates a `WeeklyPlan` + optional `MealPrep` entries for the upcoming week. |
+
+All three routes default to GPT-4.1 class models. Override them via `.env` if needed:
+
+```
+AI_COMPLIANCE_MODEL=gpt-4.1-mini
+AI_BODY_COMP_MODEL=gpt-4.1
+AI_WEEKLY_PLAN_MODEL=gpt-4.1
+```
+
+They reuse `OPENAI_API_KEY` and expect recent workout data + check-ins (weight/photo) to be present—otherwise the routes return `400` with a helpful error.
+
 ### Useful Scripts
 
 | Script | Purpose |

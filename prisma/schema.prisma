@@ -8,26 +8,28 @@ datasource db {
 }
 
 model User {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  passwordHash     String
-  role             String    @default("athlete")
-  age              Int?
-  sex              String?
-  bodyweightKg     Float?
-  experienceLevel  String    @default("BEGINNER")
-  equipmentProfile String    @default("FULL_GYM")
-  goalFocus        String?   @default("HYPERTROPHY")
-  scheduleWorkoutsPerWeek Int? 
+  id                        String     @id @default(cuid())
+  email                     String     @unique
+  passwordHash              String
+  role                      String     @default("athlete")
+  age                       Int?
+  sex                       String?
+  bodyweightKg              Float?
+  experienceLevel           String     @default("BEGINNER")
+  equipmentProfile          String     @default("FULL_GYM")
+  goalFocus                 String?    @default("HYPERTROPHY")
+  scheduleWorkoutsPerWeek   Int?
   scheduleMinutesPerSession Int?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @updatedAt
 
-  goals            Goal[]
-  workoutTemplates WorkoutTemplate[]
-  workouts         WorkoutSession[]
-  preferences      UserExercisePreference[]
-  aiRecommendations AiRecommendation[]
+  goals                     Goal[]
+  workoutTemplates          WorkoutTemplate[]
+  workouts                  WorkoutSession[]
+  preferences               UserExercisePreference[]
+  aiRecommendations         AiRecommendation[]
+  progressCheckIns          ProgressCheckIn[]
+  weeklyPlans               WeeklyPlan[]
 }
 
 model Goal {
@@ -96,53 +98,97 @@ model TemplateDay {
 }
 
 model TemplateDayExercise {
-  id            String    @id @default(cuid())
-  templateDay   TemplateDay @relation(fields: [templateDayId], references: [id])
-  templateDayId String
-  exercise      Exercise  @relation(fields: [exerciseId], references: [id])
-  exerciseId    String
-  prescribedSets Int
-  prescribedReps String
-  targetRpe     Float?
+  id              String     @id @default(cuid())
+  templateDay     TemplateDay @relation(fields: [templateDayId], references: [id])
+  templateDayId   String
+  exercise        Exercise   @relation(fields: [exerciseId], references: [id])
+  exerciseId      String
+  prescribedSets  Int
+  prescribedReps  String
+  targetRpe       Float?
   initialWeightKg Float?
-  instructions  String?
+  instructions    String?
 }
 
 model WorkoutSession {
-  id                String     @id @default(cuid())
-  user              User       @relation(fields: [userId], references: [id])
-  userId            String
-  templateDay       TemplateDay? @relation(fields: [templateDayId], references: [id])
-  templateDayId     String?
-  sessionDate       DateTime
+  id                  String     @id @default(cuid())
+  user                User       @relation(fields: [userId], references: [id])
+  userId              String
+  templateDay         TemplateDay? @relation(fields: [templateDayId], references: [id])
+  templateDayId       String?
+  sessionDate         DateTime
   perceivedDifficulty Int?
-  durationMinutes   Int?
-  notes             String?
-  createdAt         DateTime   @default(now())
-  setEntries        SetEntry[]
+  durationMinutes     Int?
+  notes               String?
+  createdAt           DateTime   @default(now())
+  setEntries          SetEntry[]
+  progressCheckIns    ProgressCheckIn[]
 }
 
 model SetEntry {
-  id              String    @id @default(cuid())
-  workoutSession  WorkoutSession @relation(fields: [workoutSessionId], references: [id])
+  id               String    @id @default(cuid())
+  workoutSession   WorkoutSession @relation(fields: [workoutSessionId], references: [id])
   workoutSessionId String
-  exercise        Exercise  @relation(fields: [exerciseId], references: [id])
-  exerciseId      String
-  setNumber       Int
-  reps            Int
-  weightKg        Float?
-  rpe             Float?
-  isPr            Boolean  @default(false)
-  notes           String?
+  exercise         Exercise  @relation(fields: [exerciseId], references: [id])
+  exerciseId       String
+  setNumber        Int
+  reps             Int
+  weightKg         Float?
+  rpe              Float?
+  isPr             Boolean  @default(false)
+  notes            String?
+  targetSets       Int?
+  targetRpe        Float?
 }
 
 model AiRecommendation {
-  id             String   @id @default(cuid())
-  user           User     @relation(fields: [userId], references: [id])
-  userId         String
-  type           String
-  promptSnapshot String
-  responsePayload String
-  applied        Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  id               String      @id @default(cuid())
+  user             User        @relation(fields: [userId], references: [id])
+  userId           String
+  type             String
+  promptSnapshot   String
+  responsePayload  String
+  applied          Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  weeklyPlans      WeeklyPlan[]
+}
+
+model ProgressCheckIn {
+  id               String          @id @default(cuid())
+  user             User            @relation(fields: [userId], references: [id])
+  userId           String
+  workoutSession   WorkoutSession? @relation(fields: [workoutSessionId], references: [id])
+  workoutSessionId String?
+  weightKg         Float?
+  readinessScore   Int?
+  appetiteScore    Int?
+  sorenessScore    Int?
+  notes            String?
+  photoUrl         String?
+  createdAt        DateTime        @default(now())
+}
+
+model WeeklyPlan {
+  id                 String            @id @default(cuid())
+  user               User              @relation(fields: [userId], references: [id])
+  userId             String
+  weekOf             DateTime
+  workoutPlanJson    String
+  mealPlanJson       String
+  aiRecommendation   AiRecommendation? @relation(fields: [aiRecommendationId], references: [id])
+  aiRecommendationId String?
+  applied            Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  meals              MealPrep[]
+}
+
+model MealPrep {
+  id            String     @id @default(cuid())
+  weeklyPlan    WeeklyPlan @relation(fields: [weeklyPlanId], references: [id])
+  weeklyPlanId  String
+  dayIndex      Int
+  mealsJson     String
+  dailyCalories Int?
+  macrosJson    String?
+  createdAt     DateTime   @default(now())
 }

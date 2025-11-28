@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import type { ProgressCheckIn } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { workoutSessionSchema } from '@/lib/validators';
+import { workoutSessionSchema, ProgressCheckInInput } from '@/lib/validators';
 import { authOptions } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
@@ -67,5 +68,33 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ session: createdSession }, { status: 201 });
+  const checkInPayload = payload.progressCheckIn;
+  let progressCheckIn: ProgressCheckIn | null = null;
+  if (checkInPayload && hasProgressCheckInData(checkInPayload)) {
+    progressCheckIn = await prisma.progressCheckIn.create({
+      data: {
+        userId: session.user.id,
+        workoutSessionId: createdSession.id,
+        weightKg: checkInPayload.weightKg,
+        readinessScore: checkInPayload.readinessScore,
+        appetiteScore: checkInPayload.appetiteScore,
+        sorenessScore: checkInPayload.sorenessScore,
+        notes: checkInPayload.notes,
+        photoUrl: checkInPayload.photoUrl,
+      },
+    });
+  }
+
+  return NextResponse.json({ session: createdSession, progressCheckIn }, { status: 201 });
+}
+
+function hasProgressCheckInData(data: ProgressCheckInInput) {
+  return (
+    data.weightKg !== undefined ||
+    data.readinessScore !== undefined ||
+    data.appetiteScore !== undefined ||
+    data.sorenessScore !== undefined ||
+    (typeof data.notes === 'string' && data.notes.trim().length > 0) ||
+    (typeof data.photoUrl === 'string' && data.photoUrl.length > 0)
+  );
 }

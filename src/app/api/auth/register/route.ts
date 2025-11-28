@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { hash } from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { GOAL_FOCUS_VALUES } from '@/lib/constants/goalFocus';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -11,7 +12,7 @@ const registerSchema = z.object({
   bodyweightKg: z.number().min(30).max(300).optional(),
   experienceLevel: z.string().optional(),
   equipmentProfile: z.string().optional(),
-  goalFocus: z.string().optional(),
+  goalFocus: z.enum(GOAL_FOCUS_VALUES).optional(),
 });
 
 export async function POST(req: NextRequest) {

@@ -12,21 +12,26 @@ const openai = apiKey
   : null;
 
 type CompletionArgs<T> = {
-  prompt: string;
+  prompt?: string;
+  input?: ResponsesCreateParams['input'];
   schema: ZodSchema<T>;
   model?: string;
 };
 
 type ResponsesCreateParams = Parameters<OpenAI['responses']['create']>[0];
 
-export async function callOpenAI<T>({ prompt, schema, model }: CompletionArgs<T>): Promise<T> {
+export async function callOpenAI<T>({ prompt, input, schema, model }: CompletionArgs<T>): Promise<T> {
   if (!openai) {
     throw new Error('OpenAI client not configured. Set OPENAI_API_KEY.');
   }
 
+  if (!prompt && !input) {
+    throw new Error('callOpenAI requires either a prompt string or an input payload.');
+  }
+
   const payload = {
     model: model ?? process.env.AI_MODEL ?? 'gpt-4.1-mini',
-    input: prompt,
+    input: input ?? prompt!,
     temperature: 0.3,
     max_output_tokens: 1800,
     response_format: { type: 'json_object' },

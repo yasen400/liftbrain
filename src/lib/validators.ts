@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+export const progressCheckInSchema = z.object({
+  weightKg: z.number().min(30).max(300).optional(),
+  readinessScore: z.number().int().min(1).max(10).optional(),
+  appetiteScore: z.number().int().min(1).max(10).optional(),
+  sorenessScore: z.number().int().min(1).max(10).optional(),
+  notes: z.string().max(500).optional(),
+  photoUrl: z.string().url().optional(),
+});
+
 export const workoutSetSchema = z.object({
   exerciseId: z.string().cuid(),
   setNumber: z.number().int().positive(),
@@ -17,6 +26,8 @@ export const workoutSessionSchema = z.object({
   perceivedDifficulty: z.number().int().min(1).max(10).optional(),
   notes: z.string().max(500).optional(),
   sets: z.array(workoutSetSchema).min(1),
+  progressCheckIn: progressCheckInSchema.optional(),
 });
 
 export type WorkoutSessionInput = z.infer<typeof workoutSessionSchema>;
+export type ProgressCheckInInput = z.infer<typeof progressCheckInSchema>;

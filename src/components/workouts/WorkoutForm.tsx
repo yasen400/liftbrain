@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { formatISO } from 'date-fns';
-import { WorkoutSessionInput } from '@/lib/validators';
+import { ProgressCheckInInput, WorkoutSessionInput } from '@/lib/validators';
 
 type WorkoutSetFormState = Omit<WorkoutSessionInput['sets'][number], 'weightKg' | 'rpe'> & {
   weightKg: number;
@@ -37,6 +37,15 @@ export function WorkoutForm({ onSessionSaved }: WorkoutFormProps) {
   const [sets, setSets] = useState<WorkoutSetFormState[]>([createDefaultSet()]);
   const [formMessage, setFormMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [weightKg, setWeightKg] = useState('');
+  const [readinessScore, setReadinessScore] = useState('');
+  const [appetiteScore, setAppetiteScore] = useState('');
+  const [sorenessScore, setSorenessScore] = useState('');
+  const [checkInNotes, setCheckInNotes] = useState('');
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoStatus, setPhotoStatus] = useState<'idle' | 'uploading' | 'uploaded' | 'error'>('idle');
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     async function loadExercises() {
@@ -75,6 +84,90 @@ export function WorkoutForm({ onSessionSaved }: WorkoutFormProps) {
     setSets((prev) => [...prev, createDefaultSet(exercises[0]?.id ?? '', prev.length + 1)]);
   }
 
+  function parseNumberField(value: string) {
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  function buildProgressCheckInPayload(): ProgressCheckInInput | null {
+    const payload = {
+      weightKg: parseNumberField(weightKg),
+      readinessScore: parseNumberField(readinessScore),
+      appetiteScore: parseNumberField(appetiteScore),
+      sorenessScore: parseNumberField(sorenessScore),
+      notes: checkInNotes.trim() ? checkInNotes.trim() : undefined,
+      photoUrl: photoUrl ?? undefined,
+    } as const;
+
+    const hasData = Object.values(payload).some((value) => value !== undefined && value !== null);
+    return hasData ? payload : null;
+  }
+
+  function resetCheckInState() {
+    setWeightKg('');
+    setReadinessScore('');
+    setAppetiteScore('');
+    setSorenessScore('');
+    setCheckInNotes('');
+    setPhotoUrl(null);
+    setPhotoStatus('idle');
+    setPhotoError(null);
+    if (photoInputRef.current) {
+      photoInputRef.current.value = '';
+    }
+  }
+
+  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setPhotoUrl(null);
+      setPhotoStatus('idle');
+      setPhotoError(null);
+      return;
+    }
+
+    setPhotoStatus('uploading');
+    setPhotoError(null);
+
+    try {
+      const presignResponse = await fetch('/api/uploads/progress-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentType: file.type,
+          fileName: file.name,
+          fileSize: file.size,
+        }),
+      });
+
+      if (!presignResponse.ok) {
+        const body = await presignResponse.json().catch(() => ({}));
+        throw new Error(body.error ?? 'Unable to prepare upload');
+      }
+
+      const presign = await presignResponse.json();
+      const uploadResponse = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload failed');
+      }
+
+      setPhotoUrl(presign.fileUrl);
+      setPhotoStatus('uploaded');
+      setPhotoError(null);
+    } catch (error) {
+      console.error(error);
+      setPhotoUrl(null);
+      setPhotoStatus('error');
+      setPhotoError(error instanceof Error ? error.message : 'Upload failed');
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!exercises.length) {
@@ -102,6 +195,11 @@ export function WorkoutForm({ onSessionSaved }: WorkoutFormProps) {
       })),
     };
 
+    const progressCheckIn = buildProgressCheckInPayload();
+    if (progressCheckIn) {
+      payload.progressCheckIn = progressCheckIn;
+    }
+
     const response = await fetch('/api/workout-sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -113,6 +211,7 @@ export function WorkoutForm({ onSessionSaved }: WorkoutFormProps) {
       setSessionDate(todayDate());
       setSets([createDefaultSet(exercises[0]?.id ?? '')]);
       setFormMessage({ type: 'success', text: 'Workout logged.' });
+      resetCheckInState();
       onSessionSaved?.();
     } else {
       const body = await response.json();
@@ -124,6 +223,7 @@ export function WorkoutForm({ onSessionSaved }: WorkoutFormProps) {
 
   const canSubmit =
     isSubmitting ||
+    photoStatus === 'uploading' ||
     !exercises.length ||
     sets.some((set) => set.setNumber <= 0 || set.reps <= 0 || set.weightKg < 0 || set.rpe < 1 || set.rpe > 10 || !set.exerciseId);
 
@@ -154,6 +254,84 @@ export function WorkoutForm({ onSessionSaved }: WorkoutFormProps) {
         Notes
         <textarea name="notes" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" rows={3} />
       </label>
+      <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-900">Session check-in (optional)</p>
+          {photoStatus === 'uploaded' ? <span className="text-xs text-emerald-700">Photo ready</span> : null}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium text-slate-700">
+            Weight (kg)
+            <input
+              type="number"
+              min={30}
+              max={300}
+              value={weightKg}
+              onChange={(event) => setWeightKg(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            Readiness (1-10)
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={readinessScore}
+              onChange={(event) => setReadinessScore(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            Appetite (1-10)
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={appetiteScore}
+              onChange={(event) => setAppetiteScore(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+          <label className="text-sm font-medium text-slate-700">
+            Soreness (1-10)
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={sorenessScore}
+              onChange={(event) => setSorenessScore(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+            />
+          </label>
+        </div>
+        <label className="text-sm font-medium text-slate-700">
+          Check-in notes
+          <textarea
+            value={checkInNotes}
+            onChange={(event) => setCheckInNotes(event.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+            rows={2}
+            placeholder="Energy, pumps, etc."
+          />
+        </label>
+        <label className="text-sm font-medium text-slate-700">
+          Progress photo
+          <input
+            type="file"
+            accept="image/*"
+            className="mt-1 w-full text-sm"
+            onChange={handlePhotoChange}
+            ref={photoInputRef}
+            disabled={photoStatus === 'uploading'}
+          />
+        </label>
+        {photoError ? <p className="text-sm text-red-600">{photoError}</p> : null}
+        {photoStatus === 'uploading' ? <p className="text-sm text-slate-500">Uploading photo…</p> : null}
+        {photoUrl && photoStatus === 'uploaded' ? (
+          <p className="text-sm text-emerald-700">Photo uploaded. It will be attached to this session.</p>
+        ) : null}
+      </div>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-slate-900">Sets</p>
