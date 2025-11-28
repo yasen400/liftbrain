@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { getLatestRecommendation } from '@/lib/dashboard';
+import { RequestAdjustmentButton } from '@/components/dashboard/RequestAdjustmentButton';
 
 export default async function AiCoachPage() {
   const session = await getServerSession(authOptions);
@@ -38,9 +39,7 @@ export default async function AiCoachPage() {
             <p>Once you connect OpenAI and log more sessions, the coach will summarize adjustments here.</p>
           </div>
         )}
-        <button className="mt-4 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">
-          Request fresh adjustment
-        </button>
+        <RequestAdjustmentButton className="mt-4" />
       </div>
     </section>
   );

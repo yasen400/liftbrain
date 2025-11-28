@@ -29,13 +29,17 @@ export async function callOpenAI<T>({ prompt, input, schema, model }: Completion
     throw new Error('callOpenAI requires either a prompt string or an input payload.');
   }
 
-  const payload = {
+  const payload: ResponsesCreateParams = {
     model: model ?? process.env.AI_MODEL ?? 'gpt-4.1-mini',
     input: input ?? prompt!,
     temperature: 0.3,
     max_output_tokens: 1800,
-    response_format: { type: 'json_object' },
-  } as ResponsesCreateParams;
+    text: {
+      format: {
+        type: 'json_object',
+      },
+    },
+  };
 
   const response = await openai.responses.create(payload);
 
