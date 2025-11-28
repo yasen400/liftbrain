@@ -203,7 +203,7 @@ export async function getDashboardData(userId: string) {
         readiness: `Planned #${idx + 1}`,
       }))
     : Array.from({ length: Math.max(2, Math.min(schedulePerWeek || 2, 3)) }).map((_, idx) => ({
-        day: format(addDays(now, idx + 1), 'EEE · Session'),
+        day: format(addDays(now, idx + 1), "EEE '· Session'"),
         focus: user?.goalFocus ? `${user.goalFocus.toLowerCase()} focus` : 'General strength session',
         duration: `${scheduledMinutes} min`,
         readiness: 'Plan',
