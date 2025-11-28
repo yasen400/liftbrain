@@ -30,7 +30,7 @@ export async function callOpenAI<T>({ prompt, input, schema, model }: Completion
   }
 
   const payload: ResponsesCreateParams = {
-    model: model ?? process.env.AI_MODEL ?? 'gpt-4o-mini',
+    model: model ?? process.env.AI_MODEL ?? 'gpt-5',
     input: input ?? prompt!,
     temperature: 0.3,
     max_output_tokens: 1800,
