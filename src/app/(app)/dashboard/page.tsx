@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation';
 import { KeyStats } from '@/components/dashboard/KeyStats';
 import { AiCoachCard } from '@/components/dashboard/AiCoachCard';
 import { UpcomingSessionsCard } from '@/components/dashboard/UpcomingSessionsCard';
+import { CoachFeedbackCard } from '@/components/dashboard/CoachFeedbackCard';
+import { WeeklyScheduleCard } from '@/components/dashboard/WeeklyScheduleCard';
+import { MealPlanCard } from '@/components/dashboard/MealPlanCard';
 import { VolumeByMuscleChart } from '@/components/charts/VolumeByMuscleChart';
 import { OneRmTrendChart } from '@/components/charts/OneRmTrendChart';
 import { Card, CardHeader } from '@/components/ui/card';
@@ -15,9 +18,10 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  const { keyStats, volumeByMuscle, oneRmTrends, upcomingSessions, recommendation } = await getDashboardData(
+  const { keyStats, volumeByMuscle, oneRmTrends, upcomingSessions, recommendation, complianceSummary, bodyCompSummary, weeklyPlan } =
+    await getDashboardData(
     session.user.id,
-  );
+    );
 
   return (
     <div className="space-y-6">
@@ -41,8 +45,13 @@ export default async function DashboardPage() {
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <UpcomingSessionsCard sessions={upcomingSessions} />
-        <AiCoachCard recommendation={recommendation} />
+        <CoachFeedbackCard compliance={complianceSummary} bodyComp={bodyCompSummary} />
       </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <WeeklyScheduleCard plan={weeklyPlan} />
+        <MealPlanCard plan={weeklyPlan} />
+      </div>
+      <AiCoachCard recommendation={recommendation} />
     </div>
   );
 }

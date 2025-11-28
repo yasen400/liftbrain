@@ -60,7 +60,9 @@ Phase 3 adds three server-side analysis steps that can be triggered on-demand (o
 | --- | --- |
 | `POST /api/ai/compliance` | Summarizes the last seven logged sessions (set completion, RPE deltas, lagging movements) and stores an `AiRecommendation` row. |
 | `POST /api/ai/body-comp` | Reviews the latest weight/check-in data plus progress-photo URLs to recommend macro adjustments. |
-| `POST /api/ai/weekly-plan` | Runs both analyzers, combines the results, and creates a `WeeklyPlan` + optional `MealPrep` entries for the upcoming week. |
+| `POST /api/ai/weekly-plan` | Runs both analyzers, combines the results, and creates a `WeeklyPlan` + `MealPrep` entries for the upcoming week. |
+| `GET /api/weekly-plan/current` | Returns the most recent plan payload + status (used by the dashboard cards). |
+| `PATCH /api/weekly-plan/:id/apply` | Marks a plan as applied and writes its schedule into `WorkoutTemplate` + `TemplateDay` rows. |
 
 All three routes default to GPT-4.1 class models. Override them via `.env` if needed:
 
@@ -71,6 +73,12 @@ AI_WEEKLY_PLAN_MODEL=gpt-4.1
 ```
 
 They reuse `OPENAI_API_KEY` and expect recent workout data + check-ins (weight/photo) to be present—otherwise the routes return `400` with a helpful error.
+
+#### Dashboard surfaces
+
+- **Coach Feedback** card merges the latest compliance report + body-comp summary so athletes can see issues, set adjustments, and macro tweaks at a glance.
+- **AI Schedule** card renders the 7-day workout outline with an `.ics` export plus an “Apply plan” CTA that copies the days into workout templates.
+- **Meal Plan** card shows per-day macros/recipes and includes a regenerate button that calls `POST /api/ai/weekly-plan` from the UI.
 
 ### Useful Scripts
 

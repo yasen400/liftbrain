@@ -33,7 +33,7 @@
    - Combine compliance + body comp context; prompt returns JSON with `workout_schedule` (list of days, focus, key lifts, set/rep ranges) and `meal_plan` (daily calories/macros + simple recipe ideas).
    - Persist as `WeeklyPlan` with pointer to stored AI payload.
 
-## Phase 4 – API & UI
+## Phase 4 – API & UI *(implemented: dashboard cards + weekly-plan routes)*
 1. **API routes**
    - `POST /api/ai/weekly-plan` (manual trigger).
    - `GET /api/weekly-plan/current` (surface inside dashboard + mobile CTA).

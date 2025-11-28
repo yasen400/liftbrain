@@ -94,6 +94,7 @@ export async function generateWeeklyPlan(userId: string) {
   });
 
   const targetWeek = startOfWeek(addDays(new Date(), 7), { weekStartsOn: 1 });
+  const serializedPlan = JSON.stringify(plan);
 
   const { recommendation, weeklyPlan } = await prisma.$transaction(async (tx) => {
     const recommendationRecord = await tx.aiRecommendation.create({
@@ -109,7 +110,7 @@ export async function generateWeeklyPlan(userId: string) {
       data: {
         userId,
         weekOf: targetWeek,
-        workoutPlanJson: JSON.stringify(plan.workout_schedule),
+        workoutPlanJson: serializedPlan,
         mealPlanJson: JSON.stringify(plan.meal_plan),
         aiRecommendationId: recommendationRecord.id,
       },

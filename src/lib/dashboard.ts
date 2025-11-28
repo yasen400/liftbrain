@@ -1,11 +1,28 @@
-import { prisma } from '@/lib/prisma';
 import { subDays, addDays, format } from 'date-fns';
+import { prisma } from '@/lib/prisma';
+import {
+  ComplianceRecommendation,
+  ComplianceRecommendationSchema,
+  BodyCompInsight,
+  BodyCompInsightSchema,
+  WeeklyPlanPayload,
+} from '@/lib/ai/schemas';
+import { getLatestWeeklyPlan } from '@/lib/weeklyPlans';
 
 export type KeyStat = { label: string; value: string; delta: string };
 export type VolumeDatum = { muscle: string; sets: number };
 export type OneRmPoint = { date: string; bench: number | null; squat: number | null; deadlift: number | null };
 export type UpcomingSession = { day: string; focus: string; duration: string; readiness: string };
 export type RecommendationSummary = { summary: string; issuedAt: string; keyChanges: string[] };
+export type ComplianceSummary = ComplianceRecommendation | null;
+export type BodyCompSummary = BodyCompInsight | null;
+export type WeeklyPlanSummary = {
+  id: string;
+  weekLabel: string;
+  weekOf: Date;
+  applied: boolean;
+  payload: WeeklyPlanPayload;
+} | null;
 
 type SessionWithSets = Array<{
   sessionDate: Date;
@@ -112,12 +129,56 @@ export async function getDashboardData(userId: string) {
     orderBy: { dayIndex: 'asc' },
     take: 4,
   });
+  const compliancePromise = prisma.aiRecommendation.findFirst({
+    where: { userId, type: 'COMPLIANCE_REVIEW' },
+    orderBy: { createdAt: 'desc' },
+  });
+  const bodyCompPromise = prisma.aiRecommendation.findFirst({
+    where: { userId, type: 'BODY_COMP' },
+    orderBy: { createdAt: 'desc' },
+  });
+  const weeklyPlanPromise = getLatestWeeklyPlan(userId);
 
-  const [user, recommendation] = await Promise.all([userPromise, getLatestRecommendation(userId)]);
+  const [user, recommendation, complianceRecord, bodyCompRecord, latestPlan] = await Promise.all([
+    userPromise,
+    getLatestRecommendation(userId),
+    compliancePromise,
+    bodyCompPromise,
+    weeklyPlanPromise,
+  ]);
   const [sessions, templateDays] = (await Promise.all([sessionsPromise, templatePromise])) as [
     SessionWithSets,
     TemplateDayData,
   ];
+
+  let complianceSummary: ComplianceSummary = null;
+  if (complianceRecord?.responsePayload) {
+    try {
+      complianceSummary = ComplianceRecommendationSchema.parse(JSON.parse(complianceRecord.responsePayload));
+    } catch {
+      complianceSummary = null;
+    }
+  }
+
+  let bodyCompSummary: BodyCompSummary = null;
+  if (bodyCompRecord?.responsePayload) {
+    try {
+      bodyCompSummary = BodyCompInsightSchema.parse(JSON.parse(bodyCompRecord.responsePayload));
+    } catch {
+      bodyCompSummary = null;
+    }
+  }
+
+  let weeklyPlanSummary: WeeklyPlanSummary = null;
+  if (latestPlan) {
+    weeklyPlanSummary = {
+      id: latestPlan.plan.id,
+      weekLabel: format(latestPlan.plan.weekOf, 'MMM d, yyyy'),
+      weekOf: latestPlan.plan.weekOf,
+      applied: latestPlan.plan.applied,
+      payload: latestPlan.payload,
+    };
+  }
 
   const weeklySessions = sessions.filter((session) => session.sessionDate >= sinceSevenDays);
   const weeklySetCount = weeklySessions.reduce((total, session) => total + session.setEntries.length, 0);
@@ -215,5 +276,8 @@ export async function getDashboardData(userId: string) {
     oneRmTrends,
     upcomingSessions,
     recommendation,
+    complianceSummary,
+    bodyCompSummary,
+    weeklyPlan: weeklyPlanSummary,
   };
 }
