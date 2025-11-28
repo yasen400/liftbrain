@@ -15,6 +15,12 @@ variable "instance_type" {
   description = "Instance size for the docker host"
 }
 
+variable "root_volume_size" {
+  type        = number
+  default     = 30
+  description = "Size of the EC2 root volume in GB"
+}
+
 variable "allowed_ssh_cidr" {
   type        = string
   default     = "0.0.0.0/0"

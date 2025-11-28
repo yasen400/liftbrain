@@ -59,6 +59,12 @@ resource "aws_instance" "liftbrain" {
   vpc_security_group_ids      = [aws_security_group.liftbrain.id]
   user_data                   = local.user_data
 
+  root_block_device {
+    volume_size = var.root_volume_size
+    volume_type = "gp3"
+    encrypted   = true
+  }
+
   tags = {
     Name = "liftbrain-app"
   }

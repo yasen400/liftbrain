@@ -103,9 +103,15 @@ export async function POST() {
       userId: user.id,
       type: 'INITIAL',
       promptSnapshot: prompt,
-      responsePayload: aiPlan,
+      responsePayload: JSON.stringify(aiPlan),
     },
   });
 
-  return NextResponse.json({ recommendation, plan: aiPlan });
+  return NextResponse.json({
+    recommendation: {
+      ...recommendation,
+      responsePayload: aiPlan,
+    },
+    plan: aiPlan,
+  });
 }
